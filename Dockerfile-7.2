@@ -32,7 +32,11 @@ RUN apt-get update \
     libfreetype6-dev \
     libssl-dev \
     libmcrypt-dev \
-  && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/* \
+  # clean
+  && apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    rm /var/log/lastlog /var/log/faillog
 
 # Install the PHP pdo_mysql extention
 RUN docker-php-ext-install pdo_mysql \
@@ -93,7 +97,11 @@ RUN rm /etc/apt/preferences.d/no-debian-php && \
     docker-php-ext-enable imagick && \
     # 新增 => XSL:
     apt install -y libxslt1.1 libxslt1-dev && \
-    docker-php-ext-install xsl
+    docker-php-ext-install xsl \
+    # clean
+    && apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    rm /var/log/lastlog /var/log/faillog
 
 ###########################################################################
 # Opcache:
