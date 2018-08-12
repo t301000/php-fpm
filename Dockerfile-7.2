@@ -6,7 +6,7 @@
 
 FROM php:7.2-fpm
 
-MAINTAINER Shih-Li Lin <t301000@gmail.com>
+LABEL maintainer="Shih-Li Lin <t301000@gmail.com>"
 
 #
 #--------------------------------------------------------------------------
@@ -34,15 +34,133 @@ RUN apt-get update \
     libmcrypt-dev \
   && rm -rf /var/lib/apt/lists/*
 
+# Install the PHP pdo_mysql extention
+RUN docker-php-ext-install pdo_mysql \
+# Install the PHP pdo_pgsql extention
+    && docker-php-ext-install pdo_pgsql \
+# Install the PHP gd library
+    && docker-php-ext-configure gd \
+        --enable-gd-native-ttf \
+        --with-jpeg-dir=/usr/lib \
+        --with-freetype-dir=/usr/include/freetype2 && \
+    docker-php-ext-install gd \
+    ######################################
+    # ZipArchive
+    ######################################
+    && docker-php-ext-install zip \
+    ######################################
+    # bcmath
+    ######################################
+    && docker-php-ext-install bcmath \
+    ######################################
+    # Exif
+    ######################################
+    && docker-php-ext-install exif \
+    ######################################
+    # Mysqli Modifications
+    ######################################
+    && docker-php-ext-install mysqli \
+    ######################################
+    # Exif
+    ######################################
+    && docker-php-ext-install exif \
+    ######################################
+    # Tokenizer Modifications
+    ######################################
+    && docker-php-ext-install tokenizer
 
- 
-  # Install the PHP pdo_mysql extention
-  RUN docker-php-ext-install pdo_mysql \
-  # Install the PHP pdo_pgsql extention
-  && docker-php-ext-install pdo_pgsql \
-  # Install the PHP gd library
-  && docker-php-ext-configure gd \
-    --enable-gd-native-ttf \
-    --with-jpeg-dir=/usr/lib \
-    --with-freetype-dir=/usr/include/freetype2 && \
-    docker-php-ext-install gd
+###########################################################################
+# SOAP:
+###########################################################################
+
+RUN rm /etc/apt/preferences.d/no-debian-php && \
+    apt-get update -yqq && \
+    apt-get -y install libxml2-dev php-soap && \
+    docker-php-ext-install soap && \
+    # Human Language and Character Encoding Support:
+    apt-get install -y zlib1g-dev libicu-dev g++ && \
+    docker-php-ext-configure intl && \
+    docker-php-ext-install intl && \
+    # GHOSTSCRIPT:
+    apt-get install -y \
+    poppler-utils \
+    ghostscript && \
+    # Image optimizers:
+    apt-get install -y --force-yes jpegoptim optipng pngquant gifsicle && \
+    # ImageMagick:
+    apt-get install -y libmagickwand-dev imagemagick && \
+    pecl install imagick && \
+    docker-php-ext-enable imagick && \
+    # 新增 => XSL:
+    apt install -y libxslt1.1 libxslt1-dev && \
+    docker-php-ext-install xsl
+
+###########################################################################
+# Opcache:
+###########################################################################
+
+RUN docker-php-ext-install opcache
+
+# Copy opcache configration
+COPY ./opcache.ini /usr/local/etc/php/conf.d/opcache.ini
+
+###########################################################################
+# PHP Memcached:
+###########################################################################
+
+RUN curl -L -o /tmp/memcached.tar.gz "https://github.com/php-memcached-dev/php-memcached/archive/php7.tar.gz" \
+    && mkdir -p memcached \
+    && tar -C memcached -zxvf /tmp/memcached.tar.gz --strip 1 \
+    && ( \
+        cd memcached \
+        && phpize \
+        && ./configure \
+        && make -j$(nproc) \
+        && make install \
+    ) \
+    && rm -r memcached \
+    && rm /tmp/memcached.tar.gz \
+    && docker-php-ext-enable memcached
+
+
+###########################################################################
+# PHP REDIS EXTENSION
+###########################################################################
+
+RUN printf "\n" | pecl install -o -f redis \
+    &&  rm -rf /tmp/pear \
+    &&  docker-php-ext-enable redis
+
+###########################################################################
+# Check PHP version:
+###########################################################################
+
+ARG PHP_VERSION=${PHP_VERSION}
+
+RUN php -v | head -n 1 | grep -q "PHP ${PHP_VERSION}."
+
+
+#
+#--------------------------------------------------------------------------
+# Final Touch
+#--------------------------------------------------------------------------
+#
+
+#COPY ./laravel.ini /usr/local/etc/php/conf.d
+#COPY ./xlaravel.pool.conf /usr/local/etc/php-fpm.d/
+
+#USER root
+
+# Clean up
+RUN apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    rm /var/log/lastlog /var/log/faillog
+
+
+RUN usermod -u 1000 www-data
+
+WORKDIR /var/www
+
+CMD ["php-fpm"]
+
+EXPOSE 9000
